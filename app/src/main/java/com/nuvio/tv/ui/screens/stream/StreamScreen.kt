@@ -298,7 +298,7 @@ fun StreamScreen(
             viewModel.onEvent(StreamScreenEvent.OnAutoPlayConsumed)
             return@LaunchedEffect
         }
-        val playbackInfo = viewModel.resolveStreamForPlayback(stream)
+        val playbackInfo = viewModel.resolveAutoPlayStreamWithBackups(stream)
         if (playbackInfo == null) {
             viewModel.onEvent(StreamScreenEvent.OnAutoPlayConsumed)
             return@LaunchedEffect

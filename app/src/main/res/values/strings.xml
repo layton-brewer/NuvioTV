@@ -986,6 +986,8 @@
     <string name="cache_duration_day_other">%1$d days</string>
     <string name="cache_duration_days_hours">%1$dd %2$dh</string>
     <string name="autoplay_mode_manual">Manual (choose stream)</string>
+    <string name="autoplay_mode_smart">Smart auto-play (recommended)</string>
+    <string name="autoplay_mode_smart_desc">Instantly play the best cached source for this TV. Series prefer full-season packs, and a failed source is replaced in the background.</string>
     <string name="autoplay_mode_first">Auto-play first source</string>
     <string name="autoplay_mode_regex">Auto-play regex match</string>
     <string name="autoplay_stream_selection">Auto Stream Selection</string>

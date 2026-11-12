@@ -367,6 +367,16 @@ open class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        // Smart auto-play picks sources that match the best picture this TV can show. The UI
+        // often renders at 1080p on a 4K panel, so look at the display's modes, not the window.
+        runCatching {
+            @Suppress("DEPRECATION")
+            val display = windowManager.defaultDisplay
+            val modeHeight = display.supportedModes.maxOfOrNull { minOf(it.physicalWidth, it.physicalHeight) }
+            val metrics = resources.displayMetrics
+            com.nuvio.tv.core.player.StreamSmartRanker.deviceMaxVideoHeight =
+                maxOf(modeHeight ?: 0, minOf(metrics.widthPixels, metrics.heightPixels))
+        }
         isFirstResumeAfterCreate = true
         window?.setBackgroundDrawable(ColorDrawable(android.graphics.Color.TRANSPARENT))
 

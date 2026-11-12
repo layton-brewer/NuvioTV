@@ -262,6 +262,11 @@ class PlayerRuntimeController(
     /** Last URL refetched after a playback error, so a link is refreshed at most once. */
     internal var linkRefreshAttemptedUrl: String? = null
 
+    /** Silent source failover bookkeeping; reset when the playing title or episode changes. */
+    internal var sourceFailoverContentKey: String? = null
+    internal val sourceFailoverTriedKeys: MutableSet<String> = mutableSetOf()
+    internal var sourceFailoverAttempts: Int = 0
+
     fun getCurrentStreamUrl(): String = currentStreamUrl
     fun getCurrentHeaders(): Map<String, String> = currentHeaders
 
@@ -580,7 +585,7 @@ class PlayerRuntimeController(
     internal var runtimeInternalPlayerEngineOverride: InternalPlayerEngine? = null
     internal var resolvedAutoPlayerEngine: InternalPlayerEngine? = null
     internal var currentInternalPlayerEngine: InternalPlayerEngine = InternalPlayerEngine.EXOPLAYER
-    internal var streamAutoPlayModeSetting: StreamAutoPlayMode = StreamAutoPlayMode.MANUAL
+    internal var streamAutoPlayModeSetting: StreamAutoPlayMode = StreamAutoPlayMode.SMART
     internal var streamAutoPlayNextEpisodeEnabledSetting: Boolean = false
     internal var streamAutoPlayPreferBingeGroupForNextEpisodeSetting: Boolean = false
     internal var streamAutoPlayTimeoutSecondsSetting: Int = 10

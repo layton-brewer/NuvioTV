@@ -37,7 +37,7 @@ object StreamAutoPlaySelector {
         return directDebridEntries + orderedAddons + pluginEntries
     }
 
-    private fun isPlayable(stream: Stream): Boolean {
+    internal fun isPlayable(stream: Stream): Boolean {
         // External URL streams (e.g. error pages, web links) are not playable.
         if (stream.isExternal()) return false
         if (stream.serverTarget != null) return true
@@ -103,7 +103,73 @@ object StreamAutoPlaySelector {
         selectedPlugins: Set<String>,
         preferredBingeGroup: String? = null,
         preferBingeGroupInSelection: Boolean = false,
-        bingeGroupOnly: Boolean = false
+        bingeGroupOnly: Boolean = false,
+        isSeries: Boolean = false
+    ): Stream? = rankAutoPlayStreams(
+        streams = streams,
+        mode = mode,
+        regexPattern = regexPattern,
+        source = source,
+        installedAddonNames = installedAddonNames,
+        selectedAddons = selectedAddons,
+        selectedPlugins = selectedPlugins,
+        preferredBingeGroup = preferredBingeGroup,
+        preferBingeGroupInSelection = preferBingeGroupInSelection,
+        bingeGroupOnly = bingeGroupOnly,
+        isSeries = isSeries
+    ).firstOrNull()
+
+    /**
+     * Every stream auto-play would accept, best first. The first entry is what
+     * [selectAutoPlayStream] returns; the rest are the backups tried in order when a source
+     * fails to play.
+     */
+    fun rankAutoPlayStreams(
+        streams: List<Stream>,
+        mode: StreamAutoPlayMode,
+        regexPattern: String,
+        source: StreamAutoPlaySource,
+        installedAddonNames: Set<String>,
+        selectedAddons: Set<String>,
+        selectedPlugins: Set<String>,
+        preferredBingeGroup: String? = null,
+        preferBingeGroupInSelection: Boolean = false,
+        bingeGroupOnly: Boolean = false,
+        isSeries: Boolean = false
+    ): List<Stream> {
+        val first = selectFirstAutoPlayStream(
+            streams = streams,
+            mode = mode,
+            regexPattern = regexPattern,
+            source = source,
+            installedAddonNames = installedAddonNames,
+            selectedAddons = selectedAddons,
+            selectedPlugins = selectedPlugins,
+            preferredBingeGroup = preferredBingeGroup,
+            preferBingeGroupInSelection = preferBingeGroupInSelection,
+            bingeGroupOnly = bingeGroupOnly,
+            isSeries = isSeries
+        ) ?: return emptyList()
+        // Backups always come from the smart ranking, whatever picked the first stream.
+        val backups = StreamSmartRanker.rank(
+            streams.filter { it != first && isPlayable(it) },
+            isSeries = isSeries
+        )
+        return listOf(first) + backups
+    }
+
+    private fun selectFirstAutoPlayStream(
+        streams: List<Stream>,
+        mode: StreamAutoPlayMode,
+        regexPattern: String,
+        source: StreamAutoPlaySource,
+        installedAddonNames: Set<String>,
+        selectedAddons: Set<String>,
+        selectedPlugins: Set<String>,
+        preferredBingeGroup: String?,
+        preferBingeGroupInSelection: Boolean,
+        bingeGroupOnly: Boolean,
+        isSeries: Boolean
     ): Stream? {
         if (streams.isEmpty()) return null
 
@@ -152,6 +218,8 @@ object StreamAutoPlaySelector {
         return when (mode) {
             StreamAutoPlayMode.MANUAL -> null
             StreamAutoPlayMode.FIRST_STREAM -> candidateStreams.firstOrNull { isPlayable(it) }
+            StreamAutoPlayMode.SMART ->
+                StreamSmartRanker.rank(candidateStreams.filter { isPlayable(it) }, isSeries = isSeries).firstOrNull()
             StreamAutoPlayMode.REGEX_MATCH -> {
                 val pattern = regexPattern.trim()
 

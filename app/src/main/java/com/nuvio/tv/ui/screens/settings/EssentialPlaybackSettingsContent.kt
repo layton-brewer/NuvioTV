@@ -64,12 +64,13 @@ fun EssentialPlaybackSettingsContent(
                             StreamAutoPlayMode.FIRST_STREAM -> stringResource(R.string.stream_auto_play_first_stream)
                             StreamAutoPlayMode.MANUAL -> stringResource(R.string.stream_auto_play_manual_short)
                             StreamAutoPlayMode.REGEX_MATCH -> stringResource(R.string.stream_auto_play_smart_match)
+                            StreamAutoPlayMode.SMART -> stringResource(R.string.autoplay_mode_smart)
                             null -> ""
                         },
                         onClick = {
-                            val current = settings?.streamAutoPlayMode ?: StreamAutoPlayMode.MANUAL
+                            val current = settings?.streamAutoPlayMode ?: StreamAutoPlayMode.SMART
                             val next = if (current == StreamAutoPlayMode.MANUAL) {
-                                StreamAutoPlayMode.FIRST_STREAM
+                                StreamAutoPlayMode.SMART
                             } else {
                                 StreamAutoPlayMode.MANUAL
                             }
