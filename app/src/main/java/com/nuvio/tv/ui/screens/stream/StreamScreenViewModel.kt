@@ -17,6 +17,7 @@ import com.nuvio.tv.core.torrent.TorrentService
 import com.nuvio.tv.core.torrent.TorrentState
 import com.nuvio.tv.core.player.StreamAutoPlayPolicy
 import com.nuvio.tv.core.player.StreamAutoPlaySelector
+import com.nuvio.tv.core.player.StreamSmartRanker
 import com.nuvio.tv.core.tracking.TrackingMediaKind
 import com.nuvio.tv.core.tracking.TrackingMediaReference
 import com.nuvio.tv.core.tracking.TrackingScrobbleAction
@@ -77,6 +78,7 @@ import javax.inject.Inject
 private const val TAG = "StreamScreenViewModel"
 private const val DIRECT_AUTOPLAY_HARD_TIMEOUT_MS = 60_000L
 private const val STREAM_FILTER_PAGE_SIZE = 100
+private const val MAX_AUTO_PLAY_RESOLVE_ATTEMPTS = 6
 
 @HiltViewModel
 class StreamScreenViewModel @Inject constructor(
@@ -629,7 +631,8 @@ class StreamScreenViewModel @Inject constructor(
                         selectedPlugins = playerSettings.streamAutoPlaySelectedPlugins,
                         preferredBingeGroup = persistedBingeGroup,
                         preferBingeGroupInSelection = true,
-                        bingeGroupOnly = true
+                        bingeGroupOnly = true,
+                        isSeries = season != null && episode != null
                     )
                 } else null
 
@@ -652,7 +655,8 @@ class StreamScreenViewModel @Inject constructor(
                         selectedAddons = playerSettings.streamAutoPlaySelectedAddons,
                         selectedPlugins = playerSettings.streamAutoPlaySelectedPlugins,
                         preferredBingeGroup = persistedBingeGroup,
-                        preferBingeGroupInSelection = persistedBingeGroup != null
+                        preferBingeGroupInSelection = persistedBingeGroup != null,
+                        isSeries = season != null && episode != null
                     )
                 }
                 if (selectedAutoPlayStream != null) {
@@ -857,7 +861,8 @@ class StreamScreenViewModel @Inject constructor(
                                     selectedPlugins = playerSettings.streamAutoPlaySelectedPlugins,
                                     preferredBingeGroup = persistedBingeGroup,
                                     preferBingeGroupInSelection = true,
-                                    bingeGroupOnly = true
+                                    bingeGroupOnly = true,
+                                    isSeries = season != null && episode != null
                                 )
                                 if (earlyMatch != null) {
                                     resolvedAutoPlayTarget = true
@@ -1301,6 +1306,30 @@ class StreamScreenViewModel @Inject constructor(
         updateUiStateIfChanged {
             it.copy(filteredStreams = full.subList(0, nextEnd))
         }
+    }
+
+    /**
+     * Resolves the auto-play pick, and when its link cannot be produced (not cached any more,
+     * stale, provider error) quietly moves on to the next best source instead of dropping the
+     * viewer into the source list.
+     */
+    suspend fun resolveAutoPlayStreamWithBackups(first: Stream): StreamPlaybackInfo? {
+        val tried = mutableSetOf<Stream>()
+        var candidate: Stream? = first
+        while (candidate != null && tried.size < MAX_AUTO_PLAY_RESOLVE_ATTEMPTS) {
+            tried += candidate
+            val resolves = !directDebridResolver.shouldResolveToPlayableStream(candidate) ||
+                // The result is kept by the resolver, so the real resolve below is instant.
+                directDebridResolver.resolveToPlayableStream(candidate, season, episode) is
+                    com.nuvio.tv.core.debrid.DirectDebridPlayableResult.Success
+            if (resolves) return resolveStreamForPlayback(candidate)
+            candidate = StreamSmartRanker.rank(
+                _uiState.value.allStreams.filter { it !in tried && StreamAutoPlaySelector.isPlayable(it) },
+                isSeries = season != null && episode != null
+            ).firstOrNull()
+        }
+        // Nothing resolved: let the normal path report why and show the list.
+        return resolveStreamForPlayback(first)
     }
 
     suspend fun resolveStreamForPlayback(stream: Stream, saveLastLink: Boolean = true): StreamPlaybackInfo? {

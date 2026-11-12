@@ -87,6 +87,7 @@ internal fun PlayerRuntimeController.tryRefreshExpiredLinkAfterError(errorMessag
 
         if (refreshed == null) {
             Log.w(PlayerRuntimeController.TAG, "No fresh link was found for the failed source")
+            if (tryFailoverToNextSource(errorMessage)) return@launch
             _uiState.update {
                 it.copy(
                     error = errorMessage,

@@ -1444,7 +1444,8 @@ private suspend fun PlayerRuntimeController.selectEpisodeAutoPlayStream(
         source = settings.streamAutoPlaySource,
         installedAddonNames = installedAddonNames,
         selectedAddons = settings.streamAutoPlaySelectedAddons,
-        selectedPlugins = settings.streamAutoPlaySelectedPlugins
+        selectedPlugins = settings.streamAutoPlaySelectedPlugins,
+        isSeries = true
     )
 }
 
@@ -2059,7 +2060,7 @@ internal fun PlayerRuntimeController.playNextEpisode(userInitiated: Boolean = fa
             val installedAddonOrder = installedAddons.map { it.displayName }
             val preferredServerNames = serverStreams.preferredSourceNames(type, nextVideo.id)
             val effectiveMode = if (shouldAutoSelectInManualMode) {
-                StreamAutoPlayMode.FIRST_STREAM
+                StreamAutoPlayMode.SMART
             } else {
                 playerSettings.streamAutoPlayMode
             }
@@ -2113,7 +2114,8 @@ internal fun PlayerRuntimeController.playNextEpisode(userInitiated: Boolean = fa
                         null
                     },
                     preferBingeGroupInSelection = playerSettings.streamAutoPlayPreferBingeGroupForNextEpisode,
-                    bingeGroupOnly = bingeGroupOnlyManualMode
+                    bingeGroupOnly = bingeGroupOnlyManualMode,
+                    isSeries = true
                 )
             }
 
@@ -2156,7 +2158,8 @@ internal fun PlayerRuntimeController.playNextEpisode(userInitiated: Boolean = fa
                     selectedPlugins = effectiveSelectedPlugins,
                     preferredBingeGroup = currentStreamBingeGroup,
                     preferBingeGroupInSelection = true,
-                    bingeGroupOnly = true
+                    bingeGroupOnly = true,
+                    isSeries = true
                 )
             }
 

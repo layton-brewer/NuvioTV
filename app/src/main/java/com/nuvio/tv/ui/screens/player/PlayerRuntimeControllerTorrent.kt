@@ -65,6 +65,12 @@ internal fun PlayerRuntimeController.observeTorrentState() {
                 is TorrentState.Streaming -> onTorrentStreaming(torrentState)
                 is TorrentState.Error -> {
                     Log.e(TAG, "Torrent error: ${torrentState.message}")
+                    if (tryFailoverToNextSource(
+                            context.getString(R.string.player_error_torrent, torrentState.message)
+                        )
+                    ) {
+                        return@collectLatest
+                    }
                     _uiState.update {
                         it.copy(
                             error = context.getString(R.string.player_error_torrent, torrentState.message),

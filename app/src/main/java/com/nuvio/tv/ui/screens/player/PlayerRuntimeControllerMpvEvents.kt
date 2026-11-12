@@ -294,6 +294,8 @@ internal fun PlayerRuntimeController.handleMpvPlaybackError(
         }
         val retryCanHelp = httpCode == null || !isPermanentHttpStatus(httpCode)
         if (retryCanHelp && attemptMpvAutoRetry(detailedError = detailedError, savedPosition = savedPosition)) return
+        // This source is not going to play: move on to the next best one.
+        if (tryFailoverToNextSource(detailedError)) return
 
         finishLoadingDiagnostics("mpv_error")
         cancelNextEpisodeAutoPlayOnFatalError()

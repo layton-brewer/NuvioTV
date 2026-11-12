@@ -89,6 +89,9 @@ internal fun shouldContinueTrailerInBackgroundOnBack(
     playInBackground: Boolean
 ): Boolean = isTrailerPlaying && autoplayEnabled && playInBackground
 
+private const val SOURCE_PRELOAD_DELAY_MS = 700L
+private const val SOURCE_PRELOAD_TIMEOUT_MS = 45_000L
+
 @HiltViewModel
 class MetaDetailsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -114,6 +117,7 @@ class MetaDetailsViewModel @Inject constructor(
     private val episodeShuffleStore: com.nuvio.tv.data.local.EpisodeShuffleStore,
     private val episodeShuffle: com.nuvio.tv.domain.model.EpisodeShuffle,
     private val playerSettingsDataStore: PlayerSettingsDataStore,
+    private val streamRepository: com.nuvio.tv.domain.repository.StreamRepository,
     private val profileManager: ProfileManager,
     private val metaDetailsSessionState: MetaDetailsSessionState,
     private val watchedSeriesStateHolder: com.nuvio.tv.data.local.WatchedSeriesStateHolder,
@@ -121,6 +125,68 @@ class MetaDetailsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
     private val itemId: String = savedStateHandle["itemId"] ?: ""
+
+    /** What a source search is keyed by: the video a Play press would start. */
+    private data class SourcePreloadTarget(
+        val type: String,
+        val videoId: String,
+        val season: Int?,
+        val episode: Int?
+    )
+
+    /**
+     * Finds sources in the background for whatever Play would start on this page (the movie,
+     * or the next episode, plus the first episode of the season being browsed). The results
+     * stay in the shared search cache, so pressing Play starts the video instead of a search.
+     */
+    private fun observeSourcePreloadTargets() {
+        viewModelScope.launch {
+            uiState
+                .map { state ->
+                    val meta = state.meta ?: return@map emptyList()
+                    val hero = resolveHeroPlaybackVideo(meta, state.nextToWatch, state.episodesForSeason)
+                    val isSeries = meta.type == ContentType.SERIES || meta.videos.isNotEmpty()
+                    val videos = if (isSeries) {
+                        listOfNotNull(hero, state.episodesForSeason.firstOrNull()).distinctBy { it.id }
+                    } else {
+                        emptyList()
+                    }
+                    if (isSeries) {
+                        videos.filter { it.available != false }.map { video ->
+                            SourcePreloadTarget(meta.apiType, video.id, video.season, video.episode)
+                        }
+                    } else {
+                        listOf(SourcePreloadTarget(meta.apiType, meta.id, null, null))
+                    }
+                }
+                .distinctUntilChanged()
+                .collectLatest { targets ->
+                    if (targets.isEmpty()) return@collectLatest
+                    // Short pause so quick browsing through titles does not hit every add-on.
+                    delay(SOURCE_PRELOAD_DELAY_MS)
+                    val settings = playerSettingsDataStore.playerSettings.first()
+                    if (settings.streamAutoPlayMode == com.nuvio.tv.data.local.StreamAutoPlayMode.MANUAL) {
+                        return@collectLatest
+                    }
+                    coroutineScope {
+                        targets.forEach { target ->
+                            launch {
+                                runCatching {
+                                    withTimeoutOrNull(SOURCE_PRELOAD_TIMEOUT_MS) {
+                                        streamRepository.getStreamsFromAllAddons(
+                                            type = target.type,
+                                            videoId = target.videoId,
+                                            season = target.season,
+                                            episode = target.episode
+                                        ).collect { }
+                                    }
+                                }.onFailure { if (it is CancellationException) throw it }
+                            }
+                        }
+                    }
+                }
+        }
+    }
     private val isServerItem = ServerItemRef.isServerId(itemId)
     private val itemType: String = savedStateHandle["itemType"] ?: ""
     private val preferredAddonBaseUrl: String? = savedStateHandle["addonBaseUrl"]
@@ -176,6 +242,7 @@ class MetaDetailsViewModel @Inject constructor(
 
     init {
         posterOptions.bind(viewModelScope)
+        observeSourcePreloadTargets()
         observeMetaViewSettings()
         observeTrailerAutoplaySettings()
         observeTraktCommentsAvailability()

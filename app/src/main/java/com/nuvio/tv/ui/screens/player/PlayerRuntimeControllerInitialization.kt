@@ -1667,6 +1667,10 @@ internal fun PlayerRuntimeController.initializePlayer(
                         if (tryServerFallback()) {
                             return
                         }
+                        // This source is not going to play: move on to the next best one.
+                        if (tryFailoverToNextSource(detailedError)) {
+                            return
+                        }
 
                         if (rebufferStartedAtMs != 0L) {
                             val lastRebufferMs = (SystemClock.elapsedRealtime() - rebufferStartedAtMs).coerceAtLeast(0L)
